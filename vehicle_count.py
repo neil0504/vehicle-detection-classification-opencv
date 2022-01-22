@@ -10,7 +10,7 @@ from tracker import *
 tracker = EuclideanDistTracker()
 
 # Initialize the videocapture object
-cap = cv2.VideoCapture('F:\\Videos and Pics\\VID_20211001_072900.mp4')
+cap = cv2.VideoCapture('Program Samples\\sample_1.mp4')
 input_size = 320
 
 # Detection confidence threshold
@@ -46,7 +46,6 @@ modelWeigheights = 'yolov3-320.weights'
 net = cv2.dnn.readNetFromDarknet(modelConfiguration, modelWeigheights)
 
 # Configure the network backend
-
 net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
 net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 
@@ -73,7 +72,7 @@ down_list = [0, 0, 0, 0]
 
 # Function for count vehicle
 def count_vehicle(box_id, img):
-    x, y, w, h, id, index = box_id
+    x, y, w, h, id_, index = box_id
 
     # Find the center of the rectangle for detection
     center = find_center(x, y, w, h)
@@ -82,23 +81,21 @@ def count_vehicle(box_id, img):
     # Find the current position of the vehicle
     if (iy > up_line_position) and (iy < middle_line_position):
 
-        if id not in temp_up_list:
-            temp_up_list.append(id)
-
-
+        if id_ not in temp_up_list:
+            temp_up_list.append(id_)
 
     elif iy < new_line_position and iy > middle_line_position:
-        if id not in temp_down_list:
-            temp_down_list.append(id)
+        if id_ not in temp_down_list:
+            temp_down_list.append(id_)
 
     elif iy < up_line_position:
-        if id in temp_down_list:
-            temp_down_list.remove(id)
+        if id_ in temp_down_list:
+            temp_down_list.remove(id_)
             up_list[index] = up_list[index] + 1
 
     elif iy > new_line_position:
-        if id in temp_up_list:
-            temp_up_list.remove(id)
+        if id_ in temp_up_list:
+            temp_up_list.remove(id_)
             down_list[index] = down_list[index] + 1
 
     # Draw circle in the middle of the rectangle
@@ -205,23 +202,19 @@ def realTime():
         cwriter.writerow(down_list)
     f1.close()
     # print("Data saved at 'data.csv'")
-    # Finally realese the capture object and destroy all active windows
+    # Finally release the capture object and destroy all active windows
     cap.release()
     cv2.destroyAllWindows()
 
 
-# image_file = 'vehicle classification-image02.png'
-# image_1 = "11.png"
-image_1 = "image_11.png"
-
 def from_static_image(image):
-    # global image_1
-    # img = cv2.imread(image)
+    global detected_classNames
 
-    img = cv2.resize(np.float32(image), (0, 0), None, 0.5, 0.5)
+    img = cv2.resize(image, (0, 0), None, fx=0.5, fy=0.5)
+    img_1 = img[175:700, 25:-50]
 
-    ih, iw, channels = img.shape
-    blob = cv2.dnn.blobFromImage(img, 1 / 255, (input_size, input_size), [0, 0, 0], 1, crop=False)
+    # ih, iw, _ = img.shape
+    blob = cv2.dnn.blobFromImage(img_1, 1 / 255, (input_size, input_size), [0, 0, 0], 1, crop=False)
 
     # Set the input of the network
     net.setInput(blob)
@@ -236,31 +229,71 @@ def from_static_image(image):
     # count the frequency of detected classes
     frequency = collections.Counter(detected_classNames)
     print(frequency)
-    # Draw counting texts in the frame
-    # cv2.putText(img, "Car:        " + str(frequency['car']), (20, 40), cv2.FONT_HERSHEY_SIMPLEX, font_size, font_color,
-    #             font_thickness)
-    # cv2.putText(img, "Motorbike:  " + str(frequency['motorbike']), (20, 60), cv2.FONT_HERSHEY_SIMPLEX, font_size,
-    #             font_color, font_thickness)
-    # cv2.putText(img, "Bus:        " + str(frequency['bus']), (20, 80), cv2.FONT_HERSHEY_SIMPLEX, font_size, font_color,
-    #             font_thickness)
-    # cv2.putText(img, "Truck:      " + str(frequency['truck']), (20, 100), cv2.FONT_HERSHEY_SIMPLEX, font_size,
-    #             font_color, font_thickness)
-    #
-    # cv2.imshow("image", img)
+    detected_classNames = []
 
-    # if cv2.waitKey(1) == ord('q'):
-    #     cv2.destroyWindow("image")
-    # cv2.waitKey(0)
+    return str(frequency['car']), str(frequency['motorbike']), str(frequency['bus']), str(frequency['truck'])
+
+
+def from_static_image_temp():
+    # Code to just get a different frame
+    c = True
+    cc = 0
+    while c:
+        success, img = cap.read()
+        cc += 1
+        if cc == 100:
+            c = False
+
+    success, img = cap.read()
+    img = cv2.resize(img, (0, 0), None, fx=0.5, fy=0.5)
+    cv2.imshow("image_1", img)
+
+    cv2.waitKey(0)
+    img_1 = img[175:700, 25:-50]
+    cv2.imshow("image_2", img_1)
+
+    cv2.waitKey(0)
+    # ih, iw, channels = img.shape
+    blob = cv2.dnn.blobFromImage(img_1, 1 / 255, (input_size, input_size), [0, 0, 0], 1, crop=False)
+
+    # Set the input of the network
+    net.setInput(blob)
+    layersNames = net.getLayerNames()
+    outputNames = [(layersNames[i[0] - 1]) for i in net.getUnconnectedOutLayers()]
+    # Feed data to the network
+    outputs = net.forward(outputNames)
+
+    # Find the objects from the network output
+    postProcess(outputs, img_1)
+
+    # count the frequency of detected classes
+    frequency = collections.Counter(detected_classNames)
+    print(frequency)
+    # Draw counting texts in the frame
+    cv2.putText(img, "Car:        " + str(frequency['car']), (20, 40), cv2.FONT_HERSHEY_SIMPLEX, font_size, font_color,
+                font_thickness)
+    cv2.putText(img, "Motorbike:  " + str(frequency['motorbike']), (20, 60), cv2.FONT_HERSHEY_SIMPLEX, font_size,
+                font_color, font_thickness)
+    cv2.putText(img, "Bus:        " + str(frequency['bus']), (20, 80), cv2.FONT_HERSHEY_SIMPLEX, font_size, font_color,
+                font_thickness)
+    cv2.putText(img, "Truck:      " + str(frequency['truck']), (20, 100), cv2.FONT_HERSHEY_SIMPLEX, font_size,
+                font_color, font_thickness)
+
+    cv2.imshow("image", img)
+
+    if cv2.waitKey(1) == ord('q'):
+        cv2.destroyWindow("image")
+    cv2.waitKey(0)
 
     # save the data to a csv file
-    # with open("static-data.csv", 'a') as f1:
-    #     cwriter = csv.writer(f1)
-    #     cwriter.writerow([image, frequency['car'], frequency['motorbike'], frequency['bus'], frequency['truck']])
-    # f1.close()
-    return str(frequency['car']), str(frequency['motorbike']), str(frequency['bus']), str(frequency['truck'])
+    with open("static-data.csv", 'a') as f1:
+        cwriter = csv.writer(f1)
+        cwriter.writerow([image, frequency['car'], frequency['motorbike'], frequency['bus'], frequency['truck']])
 
 
 if __name__ == '__main__':
     # realTime()
-    image_1 = cv2.imread(image_1)
-    from_static_image(image_1)
+    # image_1 = "image_11.png"
+    # image_1 = cv2.imread(image_1)
+    from_static_image_temp()
+    # realTime()

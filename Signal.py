@@ -1,30 +1,30 @@
-import random
 import math
-import time
-import threading
-# from vehicle_detection import detection
-import pygame
-# import pygame.font
-import sys
 import os
-import vehicle_count
+import sys
+import threading
+import time
 import cv2
+import pygame
+# from gtts import gTTS
 
-defaultRed = 20
+from win32com.client import Dispatch
+
+import vehicle_count
+
+defaultRed = 10
 defaultYellow = 5
 defaultGreen = 20
 defaultMinimum = 10
-defaultMaximum = 100
+defaultMaximum = 80
 
 timeElapsed = 0
-simTime = 120
+simTime = 200
 
-signalCoods = [(530 / 2, 230)]
-signalTimerCoods = [(530 / 2, 210)]
+signalCoods = [(165, 170)]
+signalTimerCoods = [(165, 150)]
 
 signals = []
-currentGreen = 0  # Indicates which signal is green
-currentYellow = 0  # Indicates whether yellow signal is on or off
+currentGreen = 0
 
 pygame.init()
 simulation = pygame.sprite.Group()
@@ -35,29 +35,35 @@ detectionTime = 5
 
 signalGreen = 0
 
-carTime = 2
-bikeTime = 1
-rickshawTime = 2.25
-busTime = 2.5
-truckTime = 2.5
+carTime = 3.25
+bikeTime = 2.25
+busTime = 4.25
+truckTime = 4.25
 
+noOfCars = 0
+noOfBikes = 0
+noOfBuses = 0
+noOfTrucks = 0
 noOfLanes = 2
+
+video_counter = 0
+cap = None
+
+total_vehicles = 0
+
+# tts = gTTS(text="Detecting Vehicles", lang='en')
+# tts.save("pcvoice.mp3")
+
+speak = Dispatch("SAPI.SpVoice").Speak
 
 
 def simulationTime():
     global timeElapsed, simTime
     while True:
-        timeElapsed += 1
+
         time.sleep(1)
+        timeElapsed += 1
         if timeElapsed == simTime:
-            totalVehicles = 0
-            # print('Lane-wise Vehicle Counts')
-            # for i in range(noOfSignals):
-            #     print('Lane', i + 1, ':', vehicles[directionNumbers[i]]['crossed'])
-            #     totalVehicles += vehicles[directionNumbers[i]]['crossed']
-            # print('Total vehicles passed: ', totalVehicles)
-            # print('Total time passed: ', timeElapsed)
-            # print('No. of vehicles passed per unit time: ', (float(totalVehicles) / float(timeElapsed)))
             print("Time's UP")
             os._exit(1)
 
@@ -69,48 +75,21 @@ def initialize():
 
 
 def setTime():
-    global noOfCars, noOfBikes, noOfBuses, noOfTrucks, noOfRickshaws, noOfLanes
-    global carTime, busTime, truckTime, rickshawTime, bikeTime
-    # os.system("say detecting vehicles, " + directionNumbers[(currentGreen + 1) % noOfSignals])
-    #    detection_result=detection(currentGreen,tfnet)
-    #    greenTime = math.ceil(((noOfCars*carTime) + (noOfRickshaws*rickshawTime) + (noOfBuses*busTime) + (noOfBikes*bikeTime))/(noOfLanes+1))
-    #    if(greenTime<defaultMinimum):
-    #       greenTime = defaultMinimum
-    #    elif(greenTime>defaultMaximum):
-    #       greenTime = defaultMaximum
-    # greenTime = len(vehicles[currentGreen][0])+len(vehicles[currentGreen][1])+len(vehicles[currentGreen][2])
-    # noOfVehicles = len(vehicles[directionNumbers[nextGreen]][1])+len(vehicles[directionNumbers[nextGreen]][2])-vehicles[directionNumbers[nextGreen]]['crossed']
-    # print("no. of vehicles = ",noOfVehicles)
+    global noOfCars, noOfBikes, noOfBuses, noOfTrucks, noOfLanes
+    global carTime, busTime, truckTime, bikeTime
+    global total_vehicles
+    # os.system("start pcvoice.mp3")
+    speak("Detecting Vehicles")
     noOfCars, noOfBuses, noOfTrucks, noOfRickshaws, noOfBikes = 0, 0, 0, 0, 0
-    # for j in range(len(vehicles[directionNumbers[nextGreen]][0])):
-    #     vehicle = vehicles[directionNumbers[nextGreen]][0][j]
-    #     if (vehicle.crossed == 0):
-    #         vclass = vehicle.vehicleClass
-    #         # print(vclass)
-    #         noOfBikes += 1
-    # for i in range(1, 3):
-    #     for j in range(len(vehicles[directionNumbers[nextGreen]][i])):
-    #         vehicle = vehicles[directionNumbers[nextGreen]][i][j]
-    #         if vehicle.crossed == 0:
-    #             vclass = vehicle.vehicleClass
-    #             # print(vclass)
-    #             if vclass == 'car':
-    #                 noOfCars += 1
-    #             elif vclass == 'bus':
-    #                 noOfBuses += 1
-    #             elif vclass == 'truck':
-    #                 noOfTrucks += 1
-    #             elif vclass == 'rickshaw':
-    #                 noOfRickshaws += 1
-    # # print(noOfCars)
 
     noOfCars, noOfBikes, noOfBuses, noOfTrucks = vehicle_count.from_static_image(frame)
-    noOfCars = int(noOfCars)
-    noOfBikes = int(noOfBikes)
-    noOfBuses = int(noOfBuses)
-    noOfTrucks = int(noOfTrucks)
+
+    noOfCars, noOfBikes, noOfBuses, noOfTrucks = int(noOfCars), int(noOfBikes), int(noOfBuses), int(noOfTrucks)
+
+    total_vehicles += (noOfCars + noOfBikes + noOfBuses + noOfTrucks)
+
     greenTime = math.ceil(((noOfCars * carTime) + (noOfBuses * busTime) + (
-            noOfTrucks * truckTime) + (noOfBikes * bikeTime)) / (noOfLanes + 1))
+            noOfTrucks * truckTime) + (noOfBikes * bikeTime)) / (noOfLanes + 2))
     # greenTime = math.ceil((noOfVehicles)/noOfLanes)
     print('Green Time: ', greenTime)
     if greenTime < defaultMinimum:
@@ -119,14 +98,18 @@ def setTime():
         greenTime = defaultMaximum
     # greenTime = random.randint(15,50)
     signals[0].green = greenTime
+    speak(f"{noOfCars} cars, {noOfBikes} motorbikes, {noOfBuses} buses and {noOfTrucks} trucks detected")
+    speak(f"Green time is {greenTime} seconds")
 
 
 def runVideo():
-    global frame
-    print(vehicle_count.cap)
+    global frame, cap
+    print(cap)
+    # cap = cv2.VideoCapture('F:\\Videos and Pics\\VID_20211001_072900.mp4')
     while True:
-        _, frame = vehicle_count.cap.read()
-        # cv2.imshow("image", frame)
+        _, frame = cap.read()
+        img = cv2.resize(frame, (0, 0), None, fx=0.5, fy=0.5)
+        cv2.imshow("image", img)
         if cv2.waitKey(1) == ord('q'):
             break
 
@@ -136,49 +119,39 @@ def runVideo():
 
 
 def repeat():
-    global currentGreen, currentYellow, nextGreen
+    global currentGreen
     global signalGreen
     print("Inside: ", signals[0].red)
-    while signals[0].red > 0:  # while the timer of current green signal is not zero
+    while signals[0].red > 0:
         # printStatus()
-        updateValues()
+
         if signals[0].red == detectionTime:  # set time of next green signal
             thread = threading.Thread(name="detection", target=setTime, args=())
             thread.daemon = True
             thread.start()
             # setTime()
         time.sleep(1)
-    signalGreen = 1
-    # set yellow signal on
-    # vehicleCountTexts[currentGreen] = "0"
-    # reset stop coordinates of lanes and vehicles
-    # for i in range(0, 3):
-    #     stops[directionNumbers[currentGreen]][i] = defaultStop[directionNumbers[currentGreen]]
-    #     for vehicle in vehicles[directionNumbers[currentGreen]][i]:
-    #         vehicle.stop = defaultStop[directionNumbers[currentGreen]]
-    while signalGreen and signals[0].green > 0:  # while the timer of current yellow signal is not zero
-        # printStatus()
         updateValues()
+    signalGreen = 1
+
+    while signalGreen and signals[0].green > 0:
+        # printStatus()
+
         time.sleep(1)
+        updateValues()
 
     signals[0].red = defaultRed
-    # currentYellow = 0  # set yellow signal off
 
-    # reset all signal times of current signal to default times
-    # signals[currentGreen].green = defaultGreen
-    # signals[currentGreen].yellow = defaultYellow
-    # signals[currentGreen].red = defaultRed
-    #
-    # currentGreen = nextGreen  # set next signal as green signal
-    # # nextGreen = (currentGreen + 1) % noOfSignals  # set next green signal
-    # signals[nextGreen].red = signals[currentGreen].yellow + signals[
-    #     currentGreen].green  # set the red time of next to next signal as (yellow time + green time) of next signal
+    thread_choose_video_1 = threading.Thread(name="Choose Video", target=chooseVideo, args=())
+    thread_choose_video_1.daemon = True
+    thread_choose_video_1.start()
+
     repeat()
 
 
 def updateValues():
-    # for i in range(0, noOfSignals):
-    i=0
+    global signalGreen
+    i = 0
     if i == currentGreen:
         if signals[i].red > 0:
             signals[i].red -= 1
@@ -186,8 +159,14 @@ def updateValues():
         else:
             signals[i].green -= 1
             signals[i].totalGreenTime += 1
-    # else:
-    #     signals[i].red -= 1
+            signalGreen = 1
+
+
+def chooseVideo():
+    global video_counter, cap
+    video_counter += 1
+    cap = cv2.VideoCapture("Program Samples\\sample_{}.mp4".format(video_counter))
+    print("Video = sample_{}".format(video_counter))
 
 
 class TrafficSignal:
@@ -203,6 +182,11 @@ class TrafficSignal:
 
 class Main:
     global signalGreen
+
+    thread_choose_video = threading.Thread(name="Choose Video", target=chooseVideo, args=())
+    thread_choose_video.start()
+    thread_choose_video.join()
+
     thread_video = threading.Thread(name="ActualVideo", target=runVideo, args=())
     thread_video.daemon = True
     thread_video.start()
@@ -219,12 +203,12 @@ class Main:
     white = (255, 255, 255)
 
     # Screensize
-    screenWidth = 700
-    screenHeight = 700
+    screenWidth = 400
+    screenHeight = 400
     screenSize = (screenWidth, screenHeight)
 
     # Setting background image i.e. image of intersection
-    background = pygame.image.load('images/mod_int.png')
+    background = pygame.image.load('background.jpg')
 
     screen = pygame.display.set_mode(screenSize)
     pygame.display.set_caption("SIMULATION")
@@ -240,7 +224,7 @@ class Main:
             if event.type == pygame.QUIT:
                 sys.exit()
 
-        # screen.blit(background, (0, 0))
+        screen.blit(background, (0, 0))
         i = 0
         if not signalGreen:
             if signals[i].red > 0:
@@ -254,35 +238,14 @@ class Main:
             else:
                 signals[i].signalText = "GO"
             screen.blit(greenSignal, signalCoods[i])
-        # if i == currentGreen:
-        #     if currentYellow == 1:
-        #         if signals[i].yellow == 0:
-        #             signals[i].signalText = "STOP"
-        #         else:
-        #             signals[i].signalText = signals[i].yellow
-        #         screen.blit(yellowSignal, signalCoods[i])
-        #     else:
-        #         if signals[i].green == 0:
-        #             signals[i].signalText = "SLOW"
-        #         else:
-        #             signals[i].signalText = signals[i].green
-        #         screen.blit(greenSignal, signalCoods[i])
-        # else:
-        #     if signals[i].red <= 10:
-        #         if signals[i].red == 0:
-        #             signals[i].signalText = "GO"
-        #         else:
-        #             signals[i].signalText = signals[i].red
-        #     else:
-        #         signals[i].signalText = "---"
-        #     screen.blit(redSignal, signalCoods[i])
+
         signalTexts = [""]
 
         signalTexts[i] = font.render(str(signals[i].signalText), True, white, black)
         screen.blit(signalTexts[i], signalTimerCoods[i])
 
         timeElapsedText = font.render(("Time Elapsed: " + str(timeElapsed)), True, black, white)
-        screen.blit(timeElapsedText, (900 / 2, 50))
+        screen.blit(timeElapsedText, (200, 50))
 
         pygame.display.update()
 
